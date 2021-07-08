@@ -51,7 +51,7 @@ class StageToRedshiftOperator(BaseOperator):
         credentials = aws_hook.get_credentials()
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
         
-        redshift.run("TRUNCATE FROM {}".format(self.table))
+        redshift.run("TRUNCATE {}".format(self.table))
 
         rendered_key = self.s3_key.format(**context)
         self.log.info("Rendered Key: {}".format(rendered_key))

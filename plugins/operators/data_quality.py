@@ -20,16 +20,19 @@ class DataQualityOperator(BaseOperator):
     def __init__(self,
                  redshift_conn_id='redshift',
                  sql_check_queries=[],
-                 expected_results=[],
                  *args, **kwargs):
 
         super(DataQualityOperator, self).__init__(*args, **kwargs)
-       
+        self.sql_check_queries = sql_check_queries
+        self.redshift_conn_id = redshift_conn_id
+
     def execute(self, context):
-        redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
+        redshift = PostgresHook(self.redshift_conn_id)
         
         for table in self.tables:
-            self.log.info("Data Quality Check for Table: {}".format(table))
+            self.log.info("Data Quality Starting...")
+
+            self.log.info("\n\n1) General Data Quality Check for Table: {} Starting...".format(table))
             
             record = redshift.get_records("SELECT * FROM {} LIMIT 1".format(table))
             records = redshift.get_records("SELECT COUNT(*) FROM {}".format(table))
@@ -46,3 +49,31 @@ class DataQualityOperator(BaseOperator):
             self.log.info("\nTable {} Data Quality Check Complete. See below details:".format(table))
             self.log.info("    First Record: {}".format(record[0]))
             self.log.info("    Total Number of Records: {}".format(num_records))
+
+            self.log.info("\nGeneral Data Quality Check for Table: {} Complete!".format(table))
+
+
+        errors_total = 0
+        errors_query = []
+
+        for query in self.sql_check_queries:
+
+            sql = query.get('sql')
+            result = query.get('result')
+            self.log.info("\n\n2) Custom Data Quality Check Starting...")
+            self.log.info("    Data Quality Query: {}".format(self.sql))
+            self.log.info("    Expected Result: {}".format(self.result))
+            
+            records = redshift.get_records(sql)[0][0]
+
+            if result != records:
+                errors_total += 1
+                errors_query.append(sql)
+
+        if errors_total > 0:
+            raise ValueError('Total Number of Failed Queries = {}'.format(errors_total))
+            raise ValueError('The following queries failed: ')
+            self.log.info(errors_query)
+
+        else:
+            self.log.info("\nCustom Data Quality Checks Complete!")

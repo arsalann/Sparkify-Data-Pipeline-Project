@@ -21,20 +21,30 @@ class LoadDimensionOperator(BaseOperator):
                  table="",
                  redshift_conn_id="",
                  sql="",
+                 truncate="",
                  *args, **kwargs):
 
         super(LoadDimensionOperator, self).__init__(*args, **kwargs)
         self.table=table
         self.redshift_conn_id=redshift_conn_id
         self.sql=sql
+        self.truncate=truncate
 
     def execute(self, context):
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
         formatted_sql = getattr(SqlQueries,self.sql)
+
+        if self.truncate:
+            self.log.info("Emptying Dimension Table: {}".format(self.table))
+            self.log.info('    Truncating Dimension tables...')
+            redshift.run("TRUNCATE {}".format(self.table))
+            
+            self.log.info('    Loading Dimension tables...')
+            redshift.run(formatted_sql)
+            self.log.info('\nDimension tables loaded!\n')
+        else:
+            self.log.info("Emptying Dimension Table: {}".format(self.table))
+            self.log.info('    Appending Dimension tables...')
+            redshift.run(formatted_sql)
+            self.log.info('\nDimension tables appended!\n')
         
-        self.log.info("Emptying Dimension Table: {}".format(self.table))
-        redshift.run("TRUNCATE FROM {}".format(self.table))
-        
-        self.log.info('Loading Dimension tables...')
-        redshift.run(formatted_sql)
-        self.log.info('\nDimension tables loaded!\n')

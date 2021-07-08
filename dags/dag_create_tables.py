@@ -11,14 +11,14 @@ default_args = {
     'retries': 3,
     'retry_delay': timedelta(minutes=5),  
     'email_on_failure': False,
-    'email_on_retry': False,    
+    'email_on_retry': False,
+    'catchup': False
 }
 
 dag = DAG('create_tables_dag',
           default_args = default_args,
           description = 'Create Fact and Dimension Tables in Redshift',
-          schedule_interval = '@once',
-          catchup = False)
+          schedule_interval = '@once')
 
 create_tables_task = PostgresOperator(
   task_id="create_tables",

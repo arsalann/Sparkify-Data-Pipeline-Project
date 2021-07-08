@@ -23,17 +23,17 @@ default_args = {
     'start_date': datetime(2019, 1, 12),
     'depends_on_past': False,
     'retries': 3,
-    'retry_delay' : timedelta(minutes=5),
-    'email_on_failure' : False,
-    'email_on_retry' : False
+    'retry_delay': timedelta(minutes=5),
+    'email_on_failure': False,
+    'email_on_retry': False,
+    'catchup': False
 }
 
 dag = DAG(
     'dag_etl_tables',
     default_args = default_args,
     description = 'Load and transform data in Redshift with Airflow',
-    schedule_interval = '@hourly',
-    catchup = False
+    schedule_interval = '@hourly'
 )
 
 
@@ -75,7 +75,8 @@ load_user_dimension_table = LoadDimensionOperator(
     dag=dag,
     table="users",
     redshift_conn_id="redshift",
-    sql="song_table_insert"
+    sql="song_table_insert",
+    truncate="True"
 )
 
 load_song_dimension_table = LoadDimensionOperator(
@@ -83,7 +84,8 @@ load_song_dimension_table = LoadDimensionOperator(
     dag=dag,
     table="songs",
     redshift_conn_id="redshift",
-    sql="user_table_insert"
+    sql="user_table_insert",
+    truncate="True"
 )
 
 load_artist_dimension_table = LoadDimensionOperator(
@@ -91,7 +93,8 @@ load_artist_dimension_table = LoadDimensionOperator(
     dag=dag,
     table="artists",
     redshift_conn_id="redshift",
-    sql="artist_table_insert"
+    sql="artist_table_insert",
+    truncate="True"
 )
 
 load_time_dimension_table = LoadDimensionOperator(
@@ -99,13 +102,34 @@ load_time_dimension_table = LoadDimensionOperator(
     dag=dag,
     table="time",
     redshift_conn_id="redshift",
-    sql="time_table_insert"
+    sql="time_table_insert",
+    truncate="True"
 )
 
 run_quality_checks = DataQualityOperator(
     task_id='Run_data_quality_checks',
     dag=dag,
     tables=["songplays", "songs", "users", "artists", "time"],
+    sql_check_queries=[
+        { 'sql': 'SELECT COUNT(*) FROM public.songplays WHERE songplay_id IS NULL', 'result': 0 },
+        { 'sql': 'SELECT COUNT(*) FROM public.users WHERE userid IS NULL', 'result': 0 },
+        { 'sql': 'SELECT COUNT(*) FROM public.songs WHERE song_id IS NULL', 'result': 0 },
+        { 'sql': 'SELECT COUNT(*) FROM public.artists WHERE artist_id IS NULL', 'result': 0 },
+        { 'sql': 'SELECT COUNT(*) FROM public."time" WHERE start_time IS NULL', 'result': 0 },
+
+        { 'sql': 'SELECT MAX(COUNT("start_time")) FROM public."time" GROUP BY start_time', 'result': 1 },
+
+        { 'sql': 'SELECT COUNT(DISTINCT "level") FROM public.songplays', 'result': 2},
+        { 'sql': 'SELECT COUNT(DISTINCT "gender") FROM public.songplays', 'result': 3},
+
+        { 'sql': 'SELECT MAX(LENGTH("songplay_id")) FROM public.songplays', 'result': 32},
+        { 'sql': 'SELECT MIN(LENGTH("songplay_id")) FROM public.songplays', 'result': 32},
+
+        { 'sql': 'SELECT LENGTH(MAX("artist_latitude")) FROM public.artists', 'result': 3},
+        { 'sql': 'SELECT LENGTH(MAX("artist_longitude")) FROM public.artists', 'result': 3},
+        
+        { 'sql': 'SELECT LENGTH(MIN("duration")) FROM public.artists', 'result': 1}
+    ],
     redshift_conn_id="redshift"
 )
 
